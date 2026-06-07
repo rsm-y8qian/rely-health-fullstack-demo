@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/inter";
+
+/* Design tokens mirrored from relyhealth.care */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+
+  --color-ink: #1c1c1c;
+  --color-ink-soft: #282828;
+  --color-cream: #faf9f7;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  font-family: var(--font-sans);
+  color: var(--color-stone-600);
+  -webkit-font-smoothing: antialiased;
+}
