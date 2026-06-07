@@ -1,6 +1,7 @@
 import { Sparkles, Heart } from "lucide-react";
 import { Pill } from "./components/Pill";
 import { Programs } from "./components/Programs";
+import { CareJourney } from "./components/CareJourney";
 
 function Nav() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
     <div className="min-h-screen bg-cream">
       <Nav />
       <Hero />
+      <CareJourney />
       <Programs />
     </div>
   );
