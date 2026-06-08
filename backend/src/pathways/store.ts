@@ -99,6 +99,13 @@ export function addPathway(p: Pathway): Pathway {
   return p;
 }
 
+export function deletePathway(id: string): boolean {
+  const i = pathways.findIndex((p) => p.id === id);
+  if (i === -1) return false;
+  pathways.splice(i, 1);
+  return true;
+}
+
 // A fresh blank workflow with a single starter step.
 export function createBlankPathway(department: string): Pathway {
   const p: Pathway = {

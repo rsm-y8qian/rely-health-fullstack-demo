@@ -57,6 +57,11 @@ export async function duplicatePathway(id: string): Promise<Pathway> {
   return data.pathway;
 }
 
+export async function deletePathway(id: string): Promise<void> {
+  const res = await fetch(`/api/pathways/${id}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) throw new Error(`Request failed (${res.status})`);
+}
+
 export async function fetchEnrollments(pathwayId: string): Promise<Enrollment[]> {
   const data = await getJSON<{ enrollments: Enrollment[] }>(
     `/api/enrollments?pathwayId=${encodeURIComponent(pathwayId)}`,

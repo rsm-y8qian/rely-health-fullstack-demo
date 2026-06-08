@@ -16,7 +16,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { AnimatePresence } from "motion/react";
 import dagre from "dagre";
-import { Trash2, Unlink, LassoSelect, Wand2 } from "lucide-react";
+import { Trash2, Unlink, LassoSelect, Wand2, Undo2 } from "lucide-react";
 import { StepNode, type StepNodeType, type StepNodeData } from "./StepNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { Palette } from "./Palette";
@@ -108,47 +108,71 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
   const [editingId, setEditingId] = useState<string | null>(null);
   const { getNodes, getEdges, deleteElements, fitView } = useReactFlow();
 
+  // Undo history: snapshot the canvas before each change; Undo restores it.
+  const [past, setPast] = useState<{ nodes: StepNodeType[]; edges: Edge[] }[]>([]);
+  const takeSnapshot = useCallback(() => {
+    setPast((p) => [
+      ...p.slice(-50),
+      { nodes: structuredClone(getNodes()) as StepNodeType[], edges: structuredClone(getEdges()) as Edge[] },
+    ]);
+  }, [getNodes, getEdges]);
+  const undo = useCallback(() => {
+    setPast((p) => {
+      if (p.length === 0) return p;
+      const prev = p[p.length - 1];
+      setNodes(prev.nodes);
+      setEdges(prev.edges);
+      return p.slice(0, -1);
+    });
+  }, [setNodes, setEdges]);
+
   const editingNode = nodes.find((n) => n.id === editingId) ?? null;
 
   const saveNode = useCallback(
     (next: StepNodeData) => {
+      takeSnapshot();
       setNodes((ns) => ns.map((n) => (n.id === editingId ? { ...n, data: next } : n)));
       setEditingId(null);
     },
-    [editingId, setNodes],
+    [editingId, setNodes, takeSnapshot],
   );
 
   useEffect(() => {
     setNodes(initial.nodes);
     setEdges(initial.edges);
+    setPast([]);
   }, [initial, setNodes, setEdges]);
 
   const onConnect = useCallback(
-    (c: Connection) =>
+    (c: Connection) => {
+      takeSnapshot();
       setEdges((eds) =>
         addEdge(
           { ...c, type: "labeled", label: "patient replied", data: { event: "patient_replied" }, animated: true },
           eds,
         ),
-      ),
-    [setEdges],
+      );
+    },
+    [setEdges, takeSnapshot],
   );
 
   const addStep = useCallback(
     (cap: Capability) => {
+      takeSnapshot();
       const id = `step-${Date.now()}`;
       setNodes((ns) => [
         ...ns,
         { id, type: "step", position: { x: 380, y: 60 }, data: { name: cap.label, action: cap.action } },
       ]);
     },
-    [setNodes],
+    [setNodes, takeSnapshot],
   );
 
   const tidy = useCallback(() => {
+    takeSnapshot();
     setNodes((ns) => layout(ns, getEdges()) as StepNodeType[]);
     setTimeout(() => fitView({ duration: 400 }), 0);
-  }, [setNodes, getEdges, fitView]);
+  }, [setNodes, getEdges, fitView, takeSnapshot]);
 
   const deleteSelected = useCallback(() => {
     deleteElements({
@@ -168,6 +192,11 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={(_, node) => setEditingId(node.id)}
+          onNodeDragStart={() => takeSnapshot()}
+          onBeforeDelete={async () => {
+            takeSnapshot();
+            return true;
+          }}
           onSelectionChange={({ nodes: n, edges: e }) => setSelCount(n.length + e.length)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -181,6 +210,14 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
           <Controls showInteractive={false} />
 
           <Panel position="top-right" className="flex gap-2">
+            <button
+              onClick={undo}
+              disabled={past.length === 0}
+              title="Undo"
+              className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 shadow-sm hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Undo2 className="size-3.5" /> Undo
+            </button>
             {selCount > 0 && (
               <button
                 onClick={deleteSelected}
@@ -205,13 +242,17 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
               <LassoSelect className="size-3.5" /> Lasso
             </button>
             <button
-              onClick={() => setEdges([])}
+              onClick={() => {
+                takeSnapshot();
+                setEdges([]);
+              }}
               className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 shadow-sm hover:bg-stone-50"
             >
               <Unlink className="size-3.5" /> Clear links
             </button>
             <button
               onClick={() => {
+                takeSnapshot();
                 setNodes([]);
                 setEdges([]);
               }}

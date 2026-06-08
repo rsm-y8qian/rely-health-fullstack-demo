@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
-import { Sparkles, ArrowUp, Loader2, Plus, Copy, Workflow } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { Sparkles, ArrowUp, Loader2, Plus, Copy, Workflow, Trash2 } from "lucide-react";
 import {
   fetchPathways,
   generatePathwayAI,
   savePathway,
   createBlankPathway,
   duplicatePathway,
+  deletePathway,
 } from "../api";
 import type { Pathway } from "../types";
 import { summarize } from "../lib/summary";
 import { useAppContext } from "../components/AppLayout";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const EXAMPLES = [
   "Diabetic patients: weekly blood-sugar check-in; call if no reply for 3 days.",
@@ -25,6 +27,8 @@ export default function BuilderHome() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const confirmTarget = pathways.find((p) => p.id === confirmId) ?? null;
 
   function reload() {
     if (department) fetchPathways(department).then(setPathways);
@@ -53,6 +57,12 @@ export default function BuilderHome() {
 
   async function duplicate(id: string) {
     await duplicatePathway(id);
+    reload();
+  }
+
+  async function remove(id: string) {
+    await deletePathway(id);
+    setConfirmId(null);
     reload();
   }
 
@@ -128,16 +138,28 @@ export default function BuilderHome() {
                 tabIndex={0}
                 className="group relative cursor-pointer rounded-2xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:shadow-lg"
               >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicate(p.id);
-                  }}
-                  title="Duplicate"
-                  className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-lg text-stone-400 opacity-0 transition hover:bg-stone-100 hover:text-ink group-hover:opacity-100"
-                >
-                  <Copy className="size-4" />
-                </button>
+                <div className="absolute right-3 top-3 flex gap-1 opacity-0 transition group-hover:opacity-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      duplicate(p.id);
+                    }}
+                    title="Duplicate"
+                    className="flex size-7 items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-ink"
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmId(p.id);
+                    }}
+                    title="Delete"
+                    className="flex size-7 items-center justify-center rounded-lg text-stone-400 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
                 <div className="flex size-9 items-center justify-center rounded-lg bg-ink-soft text-white">
                   <Workflow className="size-5" />
                 </div>
@@ -160,6 +182,17 @@ export default function BuilderHome() {
       >
         <Plus className="size-6" />
       </motion.button>
+
+      <AnimatePresence>
+        {confirmTarget && (
+          <ConfirmDialog
+            title="Delete workflow?"
+            message={`“${confirmTarget.name}” will be permanently removed. This can't be undone.`}
+            onConfirm={() => remove(confirmTarget.id)}
+            onCancel={() => setConfirmId(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

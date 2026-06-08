@@ -11,6 +11,7 @@ import {
   addPathway,
   createBlankPathway,
   duplicatePathway,
+  deletePathway,
 } from "./pathways/store.js";
 import {
   enroll,
@@ -78,6 +79,12 @@ app.post("/api/pathways/:id/duplicate", (req, res) => {
   const copy = duplicatePathway(req.params.id);
   if (!copy) return res.status(404).json({ error: "Pathway not found" });
   res.status(201).json({ pathway: copy });
+});
+
+// Delete a workflow.
+app.delete("/api/pathways/:id", (req, res) => {
+  if (!deletePathway(req.params.id)) return res.status(404).json({ error: "Pathway not found" });
+  res.status(204).end();
 });
 
 // A single pathway by id (what the builder canvas loads).
