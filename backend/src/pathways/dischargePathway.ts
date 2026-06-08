@@ -5,6 +5,7 @@ import type { Pathway } from "./types.js";
 export const dischargePathway: Pathway = {
   id: "discharge-followup",
   name: "Post-Discharge Follow-up",
+  department: "Cardiology",
   startStepId: "checkin",
   steps: [
     {

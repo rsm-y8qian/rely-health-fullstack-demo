@@ -5,11 +5,15 @@ import {
   CalendarCheck,
   PhoneCall,
   MapPin,
+  MessageSquare,
+  Mail,
+  UserPlus,
+  CheckCircle2,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
-// Maps the icon name string from the API to a real icon component.
+// Maps an icon name string (from the API) to a real icon component.
 const map: Record<string, LucideIcon> = {
   HeartPulse,
   ShieldCheck,
@@ -17,8 +21,26 @@ const map: Record<string, LucideIcon> = {
   CalendarCheck,
   PhoneCall,
   MapPin,
+  MessageSquare,
+  Mail,
+  UserPlus,
+  CheckCircle2,
 };
 
 export function iconFor(name: string): LucideIcon {
   return map[name] ?? Sparkles;
+}
+
+// Maps a pathway action type to its icon.
+const actionIcons: Record<string, string> = {
+  send_sms: "MessageSquare",
+  send_email: "Mail",
+  schedule_call: "PhoneCall",
+  escalate_to_human: "UserPlus",
+  book_appointment: "CalendarCheck",
+  complete: "CheckCircle2",
+};
+
+export function iconForAction(action: string): LucideIcon {
+  return iconFor(actionIcons[action] ?? "Sparkles");
 }

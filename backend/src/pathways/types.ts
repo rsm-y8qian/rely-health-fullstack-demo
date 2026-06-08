@@ -29,6 +29,7 @@ export interface PathwayStep {
 export interface Pathway {
   id: string;
   name: string;
+  department?: string; // which service line owns this pathway (lightweight tenancy)
   startStepId: string;
   steps: PathwayStep[];
 }
