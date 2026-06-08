@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  getSmoothStepPath,
   useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
@@ -25,13 +25,15 @@ export function LabeledEdge({
   data,
   markerEnd,
 }: EdgeProps) {
-  const [path, labelX, labelY] = getBezierPath({
+  // Orthogonal (right-angle) routing for a clean flowchart look.
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    borderRadius: 10,
   });
   // Nudge the label perpendicular by direction so two opposite edges between the
   // same pair of nodes don't stack their labels on top of each other.
