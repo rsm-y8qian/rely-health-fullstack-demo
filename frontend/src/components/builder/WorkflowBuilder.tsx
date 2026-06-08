@@ -28,9 +28,11 @@ const NODE_H = 110;
 function layout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 90, nodesep: 70 });
+  // Generous spacing + reserve space for each edge's label so labels don't
+  // land on top of nodes.
+  g.setGraph({ rankdir: "TB", ranksep: 120, nodesep: 110, edgesep: 40 });
   nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
-  edges.forEach((e) => g.setEdge(e.source, e.target));
+  edges.forEach((e) => g.setEdge(e.source, e.target, { width: 90, height: 24, labelpos: "c" }));
   dagre.layout(g);
   return nodes.map((n) => {
     const p = g.node(n.id);

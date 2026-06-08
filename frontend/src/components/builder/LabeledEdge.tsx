@@ -14,6 +14,8 @@ const pretty = (s: string) => s.replace(/_/g, " ");
 // editable via a dropdown of valid events (free text would break the engine).
 export function LabeledEdge({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -31,6 +33,9 @@ export function LabeledEdge({
     targetY,
     targetPosition,
   });
+  // Nudge the label perpendicular by direction so two opposite edges between the
+  // same pair of nodes don't stack their labels on top of each other.
+  const offsetY = source < target ? -11 : 11;
   const { deleteElements, setEdges } = useReactFlow();
   const [editing, setEditing] = useState(false);
   const event = (data?.event as EventType) ?? "patient_replied";
@@ -48,8 +53,9 @@ export function LabeledEdge({
       <EdgeLabelRenderer>
         <div
           style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + offsetY}px)`,
             pointerEvents: "all",
+            zIndex: 1000,
           }}
           className="nodrag nopan group/edge absolute flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-medium text-stone-600 shadow-sm"
         >
