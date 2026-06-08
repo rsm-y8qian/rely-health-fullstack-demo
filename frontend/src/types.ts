@@ -40,6 +40,8 @@ export interface Pathway {
   id: string;
   name: string;
   department?: string;
+  description?: string;
+  updatedAt?: string;
   startStepId: string;
   steps: PathwayStep[];
 }

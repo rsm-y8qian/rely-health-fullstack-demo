@@ -12,6 +12,7 @@ import {
   createBlankPathway,
   duplicatePathway,
   deletePathway,
+  updatePathwayMeta,
 } from "./pathways/store.js";
 import {
   enroll,
@@ -79,6 +80,19 @@ app.post("/api/pathways/:id/duplicate", (req, res) => {
   const copy = duplicatePathway(req.params.id);
   if (!copy) return res.status(404).json({ error: "Pathway not found" });
   res.status(201).json({ pathway: copy });
+});
+
+// Rename / re-describe a workflow.
+const metaSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+app.patch("/api/pathways/:id", (req, res) => {
+  const parsed = metaSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+  const p = updatePathwayMeta(req.params.id, parsed.data);
+  if (!p) return res.status(404).json({ error: "Pathway not found" });
+  res.json({ pathway: p });
 });
 
 // Delete a workflow.

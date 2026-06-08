@@ -30,6 +30,8 @@ export interface Pathway {
   id: string;
   name: string;
   department?: string; // which service line owns this pathway (lightweight tenancy)
+  description?: string; // short human-written summary (overrides the auto one)
+  updatedAt?: string; // ISO timestamp of last edit
   startStepId: string;
   steps: PathwayStep[];
 }

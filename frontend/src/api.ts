@@ -62,6 +62,20 @@ export async function deletePathway(id: string): Promise<void> {
   if (!res.ok && res.status !== 204) throw new Error(`Request failed (${res.status})`);
 }
 
+export async function updatePathwayMeta(
+  id: string,
+  meta: { name?: string; description?: string },
+): Promise<Pathway> {
+  const res = await fetch(`/api/pathways/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(meta),
+  });
+  const data = (await res.json()) as { pathway?: Pathway; error?: string };
+  if (!res.ok || !data.pathway) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data.pathway;
+}
+
 export async function fetchEnrollments(pathwayId: string): Promise<Enrollment[]> {
   const data = await getJSON<{ enrollments: Enrollment[] }>(
     `/api/enrollments?pathwayId=${encodeURIComponent(pathwayId)}`,

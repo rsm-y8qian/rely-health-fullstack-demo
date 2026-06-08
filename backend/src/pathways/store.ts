@@ -82,6 +82,13 @@ const pathways: Pathway[] = [
   chemoSymptomPathway,
 ];
 
+// Stagger the seeds' "last edited" times so the cards show varied relative ages.
+const now = Date.now();
+dischargePathway.updatedAt = new Date(now - 6 * 60 * 1000).toISOString(); // ~6 min ago
+heartFailurePathway.updatedAt = new Date(now - 3 * 60 * 60 * 1000).toISOString(); // ~3 hours ago
+oncologyPathway.updatedAt = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(); // ~2 days ago
+chemoSymptomPathway.updatedAt = new Date(now - 26 * 60 * 60 * 1000).toISOString(); // ~1 day ago
+
 export function listDepartments(): string[] {
   return [...new Set(pathways.map((p) => p.department).filter((d): d is string => !!d))];
 }
@@ -95,7 +102,20 @@ export function getPathway(id: string): Pathway | undefined {
 }
 
 export function addPathway(p: Pathway): Pathway {
+  p.updatedAt = p.updatedAt ?? new Date().toISOString();
   pathways.push(p);
+  return p;
+}
+
+export function updatePathwayMeta(
+  id: string,
+  meta: { name?: string; description?: string },
+): Pathway | undefined {
+  const p = getPathway(id);
+  if (!p) return undefined;
+  if (typeof meta.name === "string" && meta.name.trim()) p.name = meta.name.trim();
+  if (typeof meta.description === "string") p.description = meta.description;
+  p.updatedAt = new Date().toISOString();
   return p;
 }
 
@@ -112,6 +132,7 @@ export function createBlankPathway(department: string): Pathway {
     id: `wf-${Date.now()}`,
     name: "Untitled workflow",
     department,
+    updatedAt: new Date().toISOString(),
     startStepId: "start",
     steps: [{ id: "start", name: "New step", action: "send_sms", transitions: {} }],
   };
@@ -131,6 +152,7 @@ export function duplicatePathway(id: string): Pathway | undefined {
     ...structuredClone(orig),
     id: `${orig.id}-copy-${Date.now()}`,
     name: `${base} (${copies})`,
+    updatedAt: new Date().toISOString(),
   };
   pathways.push(copy);
   return copy;

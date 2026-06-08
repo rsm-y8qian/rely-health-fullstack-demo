@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, ArrowUp, Loader2, Plus, Copy, Workflow, Trash2 } from "lucide-react";
+import { Sparkles, ArrowUp, Loader2, Plus, Copy, Workflow, Trash2, Pencil } from "lucide-react";
 import {
   fetchPathways,
   generatePathwayAI,
@@ -9,11 +9,14 @@ import {
   createBlankPathway,
   duplicatePathway,
   deletePathway,
+  updatePathwayMeta,
 } from "../api";
 import type { Pathway } from "../types";
 import { summarize } from "../lib/summary";
+import { formatRelativeTime } from "../lib/format";
 import { useAppContext } from "../components/AppLayout";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EditMetaDialog } from "../components/EditMetaDialog";
 
 const EXAMPLES = [
   "Diabetic patients: weekly blood-sugar check-in; call if no reply for 3 days.",
@@ -29,6 +32,8 @@ export default function BuilderHome() {
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const confirmTarget = pathways.find((p) => p.id === confirmId) ?? null;
+  const [editId, setEditId] = useState<string | null>(null);
+  const editTarget = pathways.find((p) => p.id === editId) ?? null;
 
   function reload() {
     if (department) fetchPathways(department).then(setPathways);
@@ -63,6 +68,12 @@ export default function BuilderHome() {
   async function remove(id: string) {
     await deletePathway(id);
     setConfirmId(null);
+    reload();
+  }
+
+  async function saveMeta(id: string, meta: { name: string; description: string }) {
+    await updatePathwayMeta(id, meta);
+    setEditId(null);
     reload();
   }
 
@@ -142,6 +153,16 @@ export default function BuilderHome() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      setEditId(p.id);
+                    }}
+                    title="Edit details"
+                    className="flex size-7 items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-ink"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       duplicate(p.id);
                     }}
                     title="Duplicate"
@@ -164,8 +185,11 @@ export default function BuilderHome() {
                   <Workflow className="size-5" />
                 </div>
                 <div className="mt-3 font-display text-lg font-medium text-ink">{p.name}</div>
-                <div className="mt-1 text-sm text-stone-500">{summarize(p)}</div>
-                <div className="mt-2 text-xs text-stone-400">{p.steps.length} steps</div>
+                <div className="mt-1 text-sm text-stone-500">{p.description || summarize(p)}</div>
+                <div className="mt-2 flex items-center justify-between text-xs text-stone-400">
+                  <span>{p.steps.length} steps</span>
+                  <span>{formatRelativeTime(p.updatedAt)}</span>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -190,6 +214,14 @@ export default function BuilderHome() {
             message={`“${confirmTarget.name}” will be permanently removed. This can't be undone.`}
             onConfirm={() => remove(confirmTarget.id)}
             onCancel={() => setConfirmId(null)}
+          />
+        )}
+        {editTarget && (
+          <EditMetaDialog
+            initialName={editTarget.name}
+            initialDescription={editTarget.description}
+            onSave={(meta) => saveMeta(editTarget.id, meta)}
+            onCancel={() => setEditId(null)}
           />
         )}
       </AnimatePresence>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
-import { ArrowLeft, Trash2 } from "lucide-react";
-import { fetchCapabilities, fetchPathway, deletePathway } from "../api";
+import { ArrowLeft, Trash2, Pencil } from "lucide-react";
+import { fetchCapabilities, fetchPathway, deletePathway, updatePathwayMeta } from "../api";
 import type { Capability, Pathway } from "../types";
 import { WorkflowBuilder } from "../components/builder/WorkflowBuilder";
 import { AiOrb } from "../components/builder/AiOrb";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EditMetaDialog } from "../components/EditMetaDialog";
 
 export default function BuilderPage() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function BuilderPage() {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [pathway, setPathway] = useState<Pathway | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMeta, setShowMeta] = useState(false);
 
   useEffect(() => {
     fetchCapabilities().then(setCapabilities);
@@ -30,6 +32,14 @@ export default function BuilderPage() {
     navigate("/app");
   }
 
+  async function saveMeta(meta: { name: string; description: string }) {
+    if (id) {
+      const updated = await updatePathwayMeta(id, meta);
+      setPathway(updated);
+    }
+    setShowMeta(false);
+  }
+
   return (
     <div className="relative h-full overflow-hidden">
       {/* Top-left controls over the canvas */}
@@ -40,6 +50,16 @@ export default function BuilderPage() {
         >
           <ArrowLeft className="size-4" /> Workflows
         </Link>
+        {pathway && (
+          <button
+            onClick={() => setShowMeta(true)}
+            title="Rename workflow"
+            className="group/name flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white/90 px-3 py-1.5 text-sm font-medium text-ink shadow-sm backdrop-blur hover:bg-stone-50"
+          >
+            {pathway.name}
+            <Pencil className="size-3.5 text-stone-400 opacity-0 transition group-hover/name:opacity-100" />
+          </button>
+        )}
         <button
           onClick={() => setConfirmDelete(true)}
           className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white/90 px-3 py-1.5 text-sm text-stone-600 shadow-sm backdrop-blur hover:border-red-300 hover:text-red-600"
@@ -65,6 +85,14 @@ export default function BuilderPage() {
             message={`“${pathway.name}” will be permanently removed. This can't be undone.`}
             onConfirm={remove}
             onCancel={() => setConfirmDelete(false)}
+          />
+        )}
+        {showMeta && pathway && (
+          <EditMetaDialog
+            initialName={pathway.name}
+            initialDescription={pathway.description}
+            onSave={saveMeta}
+            onCancel={() => setShowMeta(false)}
           />
         )}
       </AnimatePresence>
