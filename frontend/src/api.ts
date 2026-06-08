@@ -66,3 +66,16 @@ export async function undoPatient(id: string): Promise<Enrollment> {
   const data = await postJSON<{ enrollment: Enrollment }>(`/api/enrollments/${id}/back`, {});
   return data.enrollment;
 }
+
+// Ask the AI to generate a pathway from natural language. Surfaces the server's
+// guardrail error message when generation is rejected.
+export async function generatePathwayAI(prompt: string, department?: string): Promise<Pathway> {
+  const res = await fetch("/api/ai/generate-pathway", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, department }),
+  });
+  const data = (await res.json()) as { pathway?: Pathway; error?: string };
+  if (!res.ok || !data.pathway) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data.pathway;
+}
