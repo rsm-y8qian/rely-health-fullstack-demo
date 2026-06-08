@@ -36,7 +36,16 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         <X className="size-3" />
       </button>
 
-      <Handle type="target" position={Position.Top} className="!size-2 !bg-stone-400" />
+      {[0, 1, 2].map((i) => (
+        <Handle
+          key={`t${i}`}
+          id={`t${i}`}
+          type="target"
+          position={Position.Top}
+          style={{ left: `${25 * (i + 1)}%` }}
+          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
+        />
+      ))}
 
       <div className="flex items-start gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink-soft text-white">
@@ -71,7 +80,16 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} className="!size-2 !bg-stone-400" />
+      {[0, 1, 2].map((i) => (
+        <Handle
+          key={`s${i}`}
+          id={`s${i}`}
+          type="source"
+          position={Position.Bottom}
+          style={{ left: `${25 * (i + 1)}%` }}
+          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
+        />
+      ))}
     </div>
   );
 }

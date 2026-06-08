@@ -56,16 +56,38 @@ function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
     },
   }));
 
+  // Spread parallel edges across 3 source/target handles so vertical runs
+  // don't stack on top of each other (keeps the flow direction legible).
+  const outCount = new Map<string, number>();
+  const inCount = new Map<string, number>();
+  for (const s of pathway.steps) {
+    for (const to of Object.values(s.transitions)) {
+      outCount.set(s.id, (outCount.get(s.id) ?? 0) + 1);
+      inCount.set(to, (inCount.get(to) ?? 0) + 1);
+    }
+  }
+  const slot = (i: number, n: number) => (n <= 1 ? 1 : n === 2 ? (i === 0 ? 0 : 2) : i % 3);
+  const outIdx = new Map<string, number>();
+  const inIdx = new Map<string, number>();
+
   const edges: Edge[] = pathway.steps.flatMap((s) =>
-    Object.entries(s.transitions).map(([event, to]) => ({
-      id: `${s.id}-${event}-${to}`,
-      source: s.id,
-      target: to,
-      type: "labeled",
-      label: event.replace(/_/g, " "),
-      data: { event },
-      animated: true,
-    })),
+    Object.entries(s.transitions).map(([event, to]) => {
+      const oi = outIdx.get(s.id) ?? 0;
+      outIdx.set(s.id, oi + 1);
+      const ii = inIdx.get(to) ?? 0;
+      inIdx.set(to, ii + 1);
+      return {
+        id: `${s.id}-${event}-${to}`,
+        source: s.id,
+        target: to,
+        sourceHandle: `s${slot(oi, outCount.get(s.id) ?? 1)}`,
+        targetHandle: `t${slot(ii, inCount.get(to) ?? 1)}`,
+        type: "labeled",
+        label: event.replace(/_/g, " "),
+        data: { event },
+        animated: true,
+      };
+    }),
   );
 
   return { nodes, edges };
