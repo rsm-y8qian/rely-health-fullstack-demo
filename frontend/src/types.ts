@@ -20,6 +20,14 @@ export type EventType =
   | "no_response"
   | "appointment_booked";
 
+// The fixed set of events the engine understands (used by editable edges).
+export const EVENT_OPTIONS: EventType[] = [
+  "patient_replied",
+  "no_response",
+  "timer_elapsed",
+  "appointment_booked",
+];
+
 export interface PathwayStep {
   id: string;
   name: string;

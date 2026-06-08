@@ -11,56 +11,39 @@ import {
   useEdgesState,
   type Connection,
   type Edge,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Trash2, Unlink, LassoSelect } from "lucide-react";
+import dagre from "dagre";
+import { Trash2, Unlink, LassoSelect, Wand2 } from "lucide-react";
 import { StepNode, type StepNodeType } from "./StepNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { Palette } from "./Palette";
 import type { Capability, Pathway } from "../../types";
 
-// Assign each step a "level" = its distance from the start (BFS), so we can lay
-// the graph out top-to-bottom with branches spread side-by-side.
-function computeLevels(pathway: Pathway): Map<string, number> {
-  const level = new Map<string, number>([[pathway.startStepId, 0]]);
-  const queue = [pathway.startStepId];
-  while (queue.length) {
-    const id = queue.shift()!;
-    const step = pathway.steps.find((s) => s.id === id);
-    if (!step) continue;
-    for (const to of Object.values(step.transitions)) {
-      if (!level.has(to)) {
-        level.set(to, (level.get(id) ?? 0) + 1);
-        queue.push(to);
-      }
-    }
-  }
-  pathway.steps.forEach((s) => { if (!level.has(s.id)) level.set(s.id, 0); });
-  return level;
+const NODE_W = 224;
+const NODE_H = 110;
+
+// Run dagre to assign clean, minimal-crossing positions (the "Tidy" layout).
+function layout(nodes: Node[], edges: Edge[]): Node[] {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "TB", ranksep: 90, nodesep: 70 });
+  nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
+  edges.forEach((e) => g.setEdge(e.source, e.target));
+  dagre.layout(g);
+  return nodes.map((n) => {
+    const p = g.node(n.id);
+    return { ...n, position: { x: p.x - NODE_W / 2, y: p.y - NODE_H / 2 } };
+  });
 }
 
 // Translate a pathway (data) into React Flow nodes + edges (visuals).
 function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
-  const level = computeLevels(pathway);
-  const byLevel = new Map<number, string[]>();
-  pathway.steps.forEach((s) => {
-    const l = level.get(s.id)!;
-    if (!byLevel.has(l)) byLevel.set(l, []);
-    byLevel.get(l)!.push(s.id);
-  });
-
-  const posById = new Map<string, { x: number; y: number }>();
-  byLevel.forEach((ids, l) => {
-    ids.forEach((id, i) => {
-      const x = 120 + (i - (ids.length - 1) / 2) * 340 + 260;
-      posById.set(id, { x, y: 40 + l * 180 });
-    });
-  });
-
   const nodes: StepNodeType[] = pathway.steps.map((s) => ({
     id: s.id,
     type: "step",
-    position: posById.get(s.id)!,
+    position: { x: 0, y: 0 },
     data: {
       name: s.name,
       action: s.action,
@@ -76,6 +59,7 @@ function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
       target: to,
       type: "labeled",
       label: event.replace(/_/g, " "),
+      data: { event },
       animated: true,
     })),
   );
@@ -87,21 +71,29 @@ const nodeTypes = { step: StepNode };
 const edgeTypes = { labeled: LabeledEdge };
 
 function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilities: Capability[] }) {
-  const initial = useMemo(() => toFlow(pathway), [pathway]);
+  const initial = useMemo(() => {
+    const f = toFlow(pathway);
+    return { nodes: layout(f.nodes, f.edges) as StepNodeType[], edges: f.edges };
+  }, [pathway]);
   const [nodes, setNodes, onNodesChange] = useNodesState<StepNodeType>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [lasso, setLasso] = useState(false);
   const [selCount, setSelCount] = useState(0);
-  const { getNodes, getEdges, deleteElements } = useReactFlow();
+  const { getNodes, getEdges, deleteElements, fitView } = useReactFlow();
 
   useEffect(() => {
-    const f = toFlow(pathway);
-    setNodes(f.nodes);
-    setEdges(f.edges);
-  }, [pathway, setNodes, setEdges]);
+    setNodes(initial.nodes);
+    setEdges(initial.edges);
+  }, [initial, setNodes, setEdges]);
 
   const onConnect = useCallback(
-    (c: Connection) => setEdges((eds) => addEdge({ ...c, type: "labeled", label: "event", animated: true }, eds)),
+    (c: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          { ...c, type: "labeled", label: "patient replied", data: { event: "patient_replied" }, animated: true },
+          eds,
+        ),
+      ),
     [setEdges],
   );
 
@@ -115,6 +107,11 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
     },
     [setNodes],
   );
+
+  const tidy = useCallback(() => {
+    setNodes((ns) => layout(ns, getEdges()) as StepNodeType[]);
+    setTimeout(() => fitView({ duration: 400 }), 0);
+  }, [setNodes, getEdges, fitView]);
 
   const deleteSelected = useCallback(() => {
     deleteElements({
@@ -145,7 +142,6 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
           <Background color="#e7e5e4" gap={20} />
           <Controls showInteractive={false} />
 
-          {/* Delete toolbar */}
           <Panel position="top-right" className="flex gap-2">
             {selCount > 0 && (
               <button
@@ -155,6 +151,12 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
                 <Trash2 className="size-3.5" /> Delete selected ({selCount})
               </button>
             )}
+            <button
+              onClick={tidy}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:bg-stone-50"
+            >
+              <Wand2 className="size-3.5" /> Tidy
+            </button>
             <button
               onClick={() => setLasso((v) => !v)}
               title="Drag a box to select, then delete"

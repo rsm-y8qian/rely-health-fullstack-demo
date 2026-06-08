@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -5,9 +6,12 @@ import {
   useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
+import { EVENT_OPTIONS, type EventType } from "../../types";
 
-// A transition edge whose label is a readable pill (white bg masks crossing
-// lines) with a delete button on hover.
+const pretty = (s: string) => s.replace(/_/g, " ");
+
+// A transition edge. Its label is the event that triggers the transition —
+// editable via a dropdown of valid events (free text would break the engine).
 export function LabeledEdge({
   id,
   sourceX,
@@ -16,7 +20,7 @@ export function LabeledEdge({
   targetY,
   sourcePosition,
   targetPosition,
-  label,
+  data,
   markerEnd,
 }: EdgeProps) {
   const [path, labelX, labelY] = getBezierPath({
@@ -27,7 +31,16 @@ export function LabeledEdge({
     targetY,
     targetPosition,
   });
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setEdges } = useReactFlow();
+  const [editing, setEditing] = useState(false);
+  const event = (data?.event as EventType) ?? "patient_replied";
+
+  function setEvent(next: EventType) {
+    setEdges((eds) =>
+      eds.map((e) => (e.id === id ? { ...e, label: pretty(next), data: { ...e.data, event: next } } : e)),
+    );
+    setEditing(false);
+  }
 
   return (
     <>
@@ -40,7 +53,25 @@ export function LabeledEdge({
           }}
           className="nodrag nopan group/edge absolute flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-medium text-stone-600 shadow-sm"
         >
-          {label}
+          {editing ? (
+            <select
+              autoFocus
+              value={event}
+              onChange={(e) => setEvent(e.target.value as EventType)}
+              onBlur={() => setEditing(false)}
+              className="bg-white text-[10px] outline-none"
+            >
+              {EVENT_OPTIONS.map((ev) => (
+                <option key={ev} value={ev}>
+                  {pretty(ev)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <button onClick={() => setEditing(true)} title="Click to change event">
+              {pretty(event)}
+            </button>
+          )}
           <button
             onClick={() => deleteElements({ edges: [{ id }] })}
             title="Delete connection"
