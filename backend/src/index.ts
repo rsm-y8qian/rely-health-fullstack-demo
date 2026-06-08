@@ -12,6 +12,7 @@ import {
   undo,
   seedEnrollments,
 } from "./pathways/enrollments.js";
+import { generatePathway } from "./ai/generatePathway.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -93,6 +94,20 @@ app.post("/api/enrollments/:id/back", (req, res) => {
   const result = undo(req.params.id);
   if ("error" in result) return res.status(400).json({ error: result.error });
   res.json({ enrollment: result });
+});
+
+// ---- AI: generate a pathway from natural language ----
+const aiSchema = z.object({
+  prompt: z.string().min(1),
+  department: z.string().optional(),
+});
+
+app.post("/api/ai/generate-pathway", async (req, res) => {
+  const parsed = aiSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+  const result = await generatePathway(parsed.data.prompt, parsed.data.department);
+  if ("error" in result) return res.status(422).json({ error: result.error });
+  res.json(result);
 });
 
 seedEnrollments();
