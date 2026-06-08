@@ -4,7 +4,14 @@ import "dotenv/config";
 import { programs } from "./data/programs.js";
 import { z } from "zod";
 import { capabilities, eventTypes } from "./pathways/capabilities.js";
-import { listDepartments, listPathways, getPathway } from "./pathways/store.js";
+import {
+  listDepartments,
+  listPathways,
+  getPathway,
+  addPathway,
+  createBlankPathway,
+  duplicatePathway,
+} from "./pathways/store.js";
 import {
   enroll,
   listEnrollments,
@@ -49,6 +56,28 @@ app.get("/api/departments", (_req, res) => {
 app.get("/api/pathways", (req, res) => {
   const department = typeof req.query.department === "string" ? req.query.department : undefined;
   res.json({ pathways: listPathways(department) });
+});
+
+// Create a fresh blank workflow (the "+" button on the home page).
+app.post("/api/pathways/blank", (req, res) => {
+  const department = typeof req.body?.department === "string" ? req.body.department : "General";
+  res.status(201).json({ pathway: createBlankPathway(department) });
+});
+
+// Save a (e.g. AI-generated) workflow so it shows up as a card.
+app.post("/api/pathways", (req, res) => {
+  const p = req.body?.pathway;
+  if (!p || typeof p.name !== "string" || !Array.isArray(p.steps)) {
+    return res.status(400).json({ error: "Invalid pathway" });
+  }
+  res.status(201).json({ pathway: addPathway(p) });
+});
+
+// Duplicate a workflow (the copy gets a " (n)" suffix).
+app.post("/api/pathways/:id/duplicate", (req, res) => {
+  const copy = duplicatePathway(req.params.id);
+  if (!copy) return res.status(404).json({ error: "Pathway not found" });
+  res.status(201).json({ pathway: copy });
 });
 
 // A single pathway by id (what the builder canvas loads).

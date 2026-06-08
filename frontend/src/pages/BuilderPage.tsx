@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { fetchCapabilities, fetchPathways } from "../api";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { fetchCapabilities, fetchPathway } from "../api";
 import type { Capability, Pathway } from "../types";
 import { WorkflowBuilder } from "../components/builder/WorkflowBuilder";
 import { AiOrb } from "../components/builder/AiOrb";
-import { useAppContext } from "../components/AppLayout";
 
 export default function BuilderPage() {
-  const { department } = useAppContext();
+  const { id } = useParams();
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [pathway, setPathway] = useState<Pathway | null>(null);
 
@@ -15,13 +16,21 @@ export default function BuilderPage() {
   }, []);
 
   useEffect(() => {
-    if (!department) return;
+    if (!id) return;
     setPathway(null);
-    fetchPathways(department).then((ps) => setPathway(ps[0] ?? null));
-  }, [department]);
+    fetchPathway(id).then(setPathway).catch(() => setPathway(null));
+  }, [id]);
 
   return (
     <div className="relative h-full overflow-hidden">
+      {/* Back to the workflow list */}
+      <Link
+        to="/app"
+        className="absolute left-[15rem] top-3 z-30 flex items-center gap-1 rounded-lg border border-stone-200 bg-white/90 px-3 py-1.5 text-sm text-stone-600 shadow-sm backdrop-blur hover:text-ink"
+      >
+        <ArrowLeft className="size-4" /> Workflows
+      </Link>
+
       {pathway && capabilities.length > 0 ? (
         <WorkflowBuilder pathway={pathway} capabilities={capabilities} />
       ) : (
@@ -30,7 +39,7 @@ export default function BuilderPage() {
         </div>
       )}
 
-      <AiOrb department={department} onPathway={setPathway} />
+      <AiOrb department={pathway?.department ?? ""} onPathway={setPathway} />
     </div>
   );
 }

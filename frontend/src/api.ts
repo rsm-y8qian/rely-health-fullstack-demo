@@ -42,6 +42,21 @@ export async function fetchCapabilities(): Promise<Capability[]> {
   return data.capabilities;
 }
 
+export async function savePathway(pathway: Pathway): Promise<Pathway> {
+  const data = await postJSON<{ pathway: Pathway }>("/api/pathways", { pathway });
+  return data.pathway;
+}
+
+export async function createBlankPathway(department: string): Promise<Pathway> {
+  const data = await postJSON<{ pathway: Pathway }>("/api/pathways/blank", { department });
+  return data.pathway;
+}
+
+export async function duplicatePathway(id: string): Promise<Pathway> {
+  const data = await postJSON<{ pathway: Pathway }>(`/api/pathways/${id}/duplicate`, {});
+  return data.pathway;
+}
+
 export async function fetchEnrollments(pathwayId: string): Promise<Enrollment[]> {
   const data = await getJSON<{ enrollments: Enrollment[] }>(
     `/api/enrollments?pathwayId=${encodeURIComponent(pathwayId)}`,
