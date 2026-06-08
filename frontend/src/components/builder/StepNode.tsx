@@ -1,12 +1,14 @@
 import { Handle, Position, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
-import { X } from "lucide-react";
-import { iconForAction } from "../icons";
+import { X, Clock, UserRound, Bot } from "lucide-react";
+import { iconForAction, labelForAction } from "../icons";
+import { formatWait } from "../../lib/format";
 import type { ActionType } from "../../types";
 
 export type StepNodeData = {
   name: string;
   action: ActionType;
-  waitHours?: number;
+  waitMinutes?: number;
+  assignee?: string;
   isStart?: boolean;
 };
 export type StepNodeType = Node<StepNodeData, "step">;
@@ -14,14 +16,15 @@ export type StepNodeType = Node<StepNodeData, "step">;
 export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
   const Icon = iconForAction(data.action);
   const { deleteElements } = useReactFlow();
+  const wait = formatWait(data.waitMinutes);
+  const isAi = data.assignee?.toLowerCase().includes("ai");
 
   return (
     <div
-      className={`group relative w-56 rounded-xl border bg-white p-3 shadow-sm transition ${
-        selected ? "border-fuchsia-400 ring-2 ring-fuchsia-200" : "border-stone-200"
+      className={`group relative w-64 cursor-pointer rounded-xl border bg-white p-3 shadow-sm transition ${
+        selected ? "border-fuchsia-400 ring-2 ring-fuchsia-200" : "border-stone-200 hover:border-stone-300"
       }`}
     >
-      {/* Delete button — appears on hover (top-left, red) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -35,28 +38,38 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
 
       <Handle type="target" position={Position.Top} className="!size-2 !bg-stone-400" />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink-soft text-white">
           <Icon className="size-5" />
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-ink">{data.name}</div>
-          <div className="truncate text-xs text-stone-400">{data.action}</div>
+        <div className="min-w-0 flex-1">
+          {/* Title (editable elsewhere) — wraps, never truncated */}
+          <div className="text-sm font-medium leading-snug text-ink">{data.name}</div>
+          {/* Human-readable task type */}
+          <div className="mt-0.5 text-xs text-stone-400">{labelForAction(data.action)}</div>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        {data.isStart && (
-          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
-            START
-          </span>
-        )}
-        {data.waitHours ? (
-          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
-            waits {data.waitHours}h
-          </span>
-        ) : null}
-      </div>
+      {(data.isStart || wait || data.assignee) && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {data.isStart && (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+              START
+            </span>
+          )}
+          {wait && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
+              <Clock className="size-2.5" /> {wait}
+            </span>
+          )}
+          {data.assignee && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600">
+              {isAi ? <Bot className="size-2.5" /> : <UserRound className="size-2.5" />}
+              {data.assignee}
+            </span>
+          )}
+        </div>
+      )}
 
       <Handle type="source" position={Position.Bottom} className="!size-2 !bg-stone-400" />
     </div>

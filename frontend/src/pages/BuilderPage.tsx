@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchCapabilities, fetchPathways } from "../api";
 import type { Capability, Pathway } from "../types";
 import { WorkflowBuilder } from "../components/builder/WorkflowBuilder";
-import { AiAssistant } from "../components/builder/AiAssistant";
+import { AiOrb } from "../components/builder/AiOrb";
 import { useAppContext } from "../components/AppLayout";
 
 export default function BuilderPage() {
@@ -21,18 +21,16 @@ export default function BuilderPage() {
   }, [department]);
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 overflow-hidden">
-        {pathway && capabilities.length > 0 ? (
-          <WorkflowBuilder pathway={pathway} capabilities={capabilities} />
-        ) : (
-          <div className="flex h-full items-center justify-center text-stone-400">
-            Loading workflow…
-          </div>
-        )}
-      </div>
+    <div className="relative h-full overflow-hidden">
+      {pathway && capabilities.length > 0 ? (
+        <WorkflowBuilder pathway={pathway} capabilities={capabilities} />
+      ) : (
+        <div className="flex h-full items-center justify-center text-stone-400">
+          Loading workflow…
+        </div>
+      )}
 
-      <AiAssistant department={department} onPathway={setPathway} />
+      <AiOrb department={department} onPathway={setPathway} />
     </div>
   );
 }

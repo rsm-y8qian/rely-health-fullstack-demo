@@ -14,11 +14,13 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { AnimatePresence } from "motion/react";
 import dagre from "dagre";
 import { Trash2, Unlink, LassoSelect, Wand2 } from "lucide-react";
-import { StepNode, type StepNodeType } from "./StepNode";
+import { StepNode, type StepNodeType, type StepNodeData } from "./StepNode";
 import { LabeledEdge } from "./LabeledEdge";
 import { Palette } from "./Palette";
+import { NodeDetailPanel } from "./NodeDetailPanel";
 import type { Capability, Pathway } from "../../types";
 
 const NODE_W = 224;
@@ -49,7 +51,7 @@ function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
     data: {
       name: s.name,
       action: s.action,
-      waitHours: s.waitHours,
+      waitMinutes: s.waitHours != null ? s.waitHours * 60 : undefined,
       isStart: s.id === pathway.startStepId,
     },
   }));
@@ -81,7 +83,18 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [lasso, setLasso] = useState(false);
   const [selCount, setSelCount] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const { getNodes, getEdges, deleteElements, fitView } = useReactFlow();
+
+  const editingNode = nodes.find((n) => n.id === editingId) ?? null;
+
+  const saveNode = useCallback(
+    (next: StepNodeData) => {
+      setNodes((ns) => ns.map((n) => (n.id === editingId ? { ...n, data: next } : n)));
+      setEditingId(null);
+    },
+    [editingId, setNodes],
+  );
 
   useEffect(() => {
     setNodes(initial.nodes);
@@ -123,7 +136,7 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
   }, [deleteElements, getNodes, getEdges]);
 
   return (
-    <div className="flex h-full">
+    <div className="relative flex h-full">
       <Palette capabilities={capabilities} onAdd={addStep} />
       <div className="h-full flex-1">
         <ReactFlow
@@ -132,6 +145,7 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeClick={(_, node) => setEditingId(node.id)}
           onSelectionChange={({ nodes: n, edges: e }) => setSelCount(n.length + e.length)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -186,6 +200,17 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
           </Panel>
         </ReactFlow>
       </div>
+
+      <AnimatePresence>
+        {editingNode && (
+          <NodeDetailPanel
+            data={editingNode.data}
+            capabilities={capabilities}
+            onSave={saveNode}
+            onClose={() => setEditingId(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

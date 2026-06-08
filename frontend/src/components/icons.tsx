@@ -44,3 +44,17 @@ const actionIcons: Record<string, string> = {
 export function iconForAction(action: string): LucideIcon {
   return iconFor(actionIcons[action] ?? "Sparkles");
 }
+
+// Human-readable label for an action type (no raw snake_case in the UI).
+const actionLabels: Record<string, string> = {
+  send_sms: "Send SMS",
+  send_email: "Send Email",
+  schedule_call: "Schedule Call",
+  escalate_to_human: "Escalate to Navigator",
+  book_appointment: "Book Appointment",
+  complete: "Complete",
+};
+
+export function labelForAction(action: string): string {
+  return actionLabels[action] ?? action;
+}
