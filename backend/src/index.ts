@@ -2,8 +2,15 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { programs } from "./data/programs.js";
+import { z } from "zod";
 import { capabilities, eventTypes } from "./pathways/capabilities.js";
 import { listDepartments, listPathways, getPathway } from "./pathways/store.js";
+import {
+  enroll,
+  listEnrollments,
+  sendEvent,
+  seedEnrollments,
+} from "./pathways/enrollments.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -48,6 +55,40 @@ app.get("/api/pathways/:id", (req, res) => {
   if (!pathway) return res.status(404).json({ error: "Pathway not found" });
   res.json({ pathway });
 });
+
+// ---- Enrollments (the engine running on real patients) ----
+
+// Validate request bodies at the system boundary — never trust the client.
+const enrollSchema = z.object({
+  patientName: z.string().min(1),
+  pathwayId: z.string().min(1),
+});
+const eventSchema = z.object({
+  event: z.enum(["timer_elapsed", "patient_replied", "no_response", "appointment_booked"]),
+});
+
+app.get("/api/enrollments", (req, res) => {
+  const pathwayId = typeof req.query.pathwayId === "string" ? req.query.pathwayId : undefined;
+  res.json({ enrollments: listEnrollments(pathwayId) });
+});
+
+app.post("/api/enrollments", (req, res) => {
+  const parsed = enrollSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid enrollment" });
+  const result = enroll(parsed.data.patientName, parsed.data.pathwayId);
+  if ("error" in result) return res.status(400).json({ error: result.error });
+  res.status(201).json({ enrollment: result });
+});
+
+app.post("/api/enrollments/:id/event", (req, res) => {
+  const parsed = eventSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid event" });
+  const result = sendEvent(req.params.id, parsed.data.event);
+  if ("error" in result) return res.status(400).json({ error: result.error });
+  res.json({ enrollment: result });
+});
+
+seedEnrollments();
 
 app.listen(PORT, () => {
   console.log(`✅ Rely demo API listening on http://localhost:${PORT}`);

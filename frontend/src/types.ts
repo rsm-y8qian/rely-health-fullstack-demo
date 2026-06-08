@@ -42,3 +42,12 @@ export interface Capability {
   description: string;
   icon: string;
 }
+
+export interface Enrollment {
+  id: string;
+  patientName: string;
+  pathwayId: string;
+  currentStepId: string;
+  status: "active" | "completed";
+  history: { stepId: string; at: string }[];
+}

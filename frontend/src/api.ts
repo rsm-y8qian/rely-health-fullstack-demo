@@ -1,7 +1,17 @@
-import type { Program, Pathway, Capability } from "./types";
+import type { Program, Pathway, Capability, Enrollment, EventType } from "./types";
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return (await res.json()) as T;
+}
+
+async function postJSON<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return (await res.json()) as T;
 }
@@ -30,4 +40,24 @@ export async function fetchPathway(id: string): Promise<Pathway> {
 export async function fetchCapabilities(): Promise<Capability[]> {
   const data = await getJSON<{ capabilities: Capability[] }>("/api/capabilities");
   return data.capabilities;
+}
+
+export async function fetchEnrollments(pathwayId: string): Promise<Enrollment[]> {
+  const data = await getJSON<{ enrollments: Enrollment[] }>(
+    `/api/enrollments?pathwayId=${encodeURIComponent(pathwayId)}`,
+  );
+  return data.enrollments;
+}
+
+export async function enrollPatient(patientName: string, pathwayId: string): Promise<Enrollment> {
+  const data = await postJSON<{ enrollment: Enrollment }>("/api/enrollments", {
+    patientName,
+    pathwayId,
+  });
+  return data.enrollment;
+}
+
+export async function sendPatientEvent(id: string, event: EventType): Promise<Enrollment> {
+  const data = await postJSON<{ enrollment: Enrollment }>(`/api/enrollments/${id}/event`, { event });
+  return data.enrollment;
 }
