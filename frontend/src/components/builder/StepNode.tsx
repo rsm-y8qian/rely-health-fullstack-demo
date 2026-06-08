@@ -1,4 +1,5 @@
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import { X } from "lucide-react";
 import { iconForAction } from "../icons";
 import type { ActionType } from "../../types";
 
@@ -10,15 +11,28 @@ export type StepNodeData = {
 };
 export type StepNodeType = Node<StepNodeData, "step">;
 
-// A single step rendered on the canvas.
-export function StepNode({ data, selected }: NodeProps<StepNodeType>) {
+export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
   const Icon = iconForAction(data.action);
+  const { deleteElements } = useReactFlow();
+
   return (
     <div
-      className={`w-56 rounded-xl border bg-white p-3 shadow-sm transition ${
+      className={`group relative w-56 rounded-xl border bg-white p-3 shadow-sm transition ${
         selected ? "border-fuchsia-400 ring-2 ring-fuchsia-200" : "border-stone-200"
       }`}
     >
+      {/* Delete button — appears on hover (top-left, red) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteElements({ nodes: [{ id }] });
+        }}
+        title="Delete block"
+        className="nodrag absolute -left-2.5 -top-2.5 flex size-5 scale-90 items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition group-hover:scale-100 group-hover:opacity-100 hover:bg-red-700"
+      >
+        <X className="size-3" />
+      </button>
+
       <Handle type="target" position={Position.Top} className="!size-2 !bg-stone-400" />
 
       <div className="flex items-center gap-3">

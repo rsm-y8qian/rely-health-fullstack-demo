@@ -61,3 +61,8 @@ export async function sendPatientEvent(id: string, event: EventType): Promise<En
   const data = await postJSON<{ enrollment: Enrollment }>(`/api/enrollments/${id}/event`, { event });
   return data.enrollment;
 }
+
+export async function undoPatient(id: string): Promise<Enrollment> {
+  const data = await postJSON<{ enrollment: Enrollment }>(`/api/enrollments/${id}/back`, {});
+  return data.enrollment;
+}

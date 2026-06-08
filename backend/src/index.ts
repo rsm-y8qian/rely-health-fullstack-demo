@@ -9,6 +9,7 @@ import {
   enroll,
   listEnrollments,
   sendEvent,
+  undo,
   seedEnrollments,
 } from "./pathways/enrollments.js";
 
@@ -84,6 +85,12 @@ app.post("/api/enrollments/:id/event", (req, res) => {
   const parsed = eventSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid event" });
   const result = sendEvent(req.params.id, parsed.data.event);
+  if ("error" in result) return res.status(400).json({ error: result.error });
+  res.json({ enrollment: result });
+});
+
+app.post("/api/enrollments/:id/back", (req, res) => {
+  const result = undo(req.params.id);
   if ("error" in result) return res.status(400).json({ error: result.error });
   res.json({ enrollment: result });
 });

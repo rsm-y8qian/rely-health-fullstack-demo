@@ -51,6 +51,17 @@ export function sendEvent(id: string, event: EventType): Enrollment | { error: s
   return e;
 }
 
+// Reverse the last advance — pop history and return to the previous step.
+export function undo(id: string): Enrollment | { error: string } {
+  const e = enrollments.find((x) => x.id === id);
+  if (!e) return { error: "Enrollment not found" };
+  if (e.history.length <= 1) return { error: "Already at the start" };
+  e.history.pop();
+  e.currentStepId = e.history[e.history.length - 1].stepId;
+  e.status = "active";
+  return e;
+}
+
 // Seed a few patients at different stages so the ops view isn't empty.
 export function seedEnrollments(): void {
   if (enrollments.length > 0) return;

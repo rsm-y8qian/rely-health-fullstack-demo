@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { UserPlus } from "lucide-react";
-import { fetchPathways, fetchEnrollments, enrollPatient, sendPatientEvent } from "../api";
+import { UserPlus, Undo2 } from "lucide-react";
+import { fetchPathways, fetchEnrollments, enrollPatient, sendPatientEvent, undoPatient } from "../api";
 import type { Enrollment, EventType, Pathway } from "../types";
 import { iconForAction } from "../components/icons";
 import { useAppContext } from "../components/AppLayout";
@@ -11,15 +11,18 @@ function PatientRow({
   enrollment,
   pathway,
   onEvent,
+  onBack,
 }: {
   enrollment: Enrollment;
   pathway: Pathway;
   onEvent: (id: string, event: EventType) => void;
+  onBack: (id: string) => void;
 }) {
   const step = pathway.steps.find((s) => s.id === enrollment.currentStepId);
   const Icon = iconForAction(step?.action ?? "complete");
   const events = step ? (Object.keys(step.transitions) as EventType[]) : [];
   const done = enrollment.status === "completed";
+  const canGoBack = enrollment.history.length > 1;
 
   return (
     <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
@@ -31,14 +34,24 @@ function PatientRow({
           <div className="font-medium text-ink">{enrollment.patientName}</div>
           <div className="text-sm text-stone-500">
             {step?.name ?? "—"}
-            <span className="ml-2 text-xs text-stone-400">
-              step {enrollment.history.length}
-            </span>
+            <span className="ml-2 text-xs text-stone-400">step {enrollment.history.length}</span>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Reverse the last advance */}
+        <button
+          onClick={() => onBack(enrollment.id)}
+          disabled={!canGoBack}
+          title="Go back one step"
+          className="flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Undo2 className="size-3.5" /> Back
+        </button>
+
+        <span className="mx-1 text-stone-200">|</span>
+
         {done ? (
           <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
             Completed
@@ -79,6 +92,11 @@ export default function OperationsPage() {
 
   async function handleEvent(id: string, event: EventType) {
     const updated = await sendPatientEvent(id, event);
+    setEnrollments((list) => list.map((e) => (e.id === id ? updated : e)));
+  }
+
+  async function handleBack(id: string) {
+    const updated = await undoPatient(id);
     setEnrollments((list) => list.map((e) => (e.id === id ? updated : e)));
   }
 
@@ -128,7 +146,7 @@ export default function OperationsPage() {
 
       <div className="mt-4 space-y-2.5">
         {enrollments.map((e) => (
-          <PatientRow key={e.id} enrollment={e} pathway={pathway} onEvent={handleEvent} />
+          <PatientRow key={e.id} enrollment={e} pathway={pathway} onEvent={handleEvent} onBack={handleBack} />
         ))}
       </div>
     </div>
