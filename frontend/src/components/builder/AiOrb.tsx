@@ -6,10 +6,10 @@ import type { Pathway } from "../../types";
 
 // A floating, animated AI launcher (bottom-right) that opens a popup chat.
 export function AiOrb({
-  department,
+  pathway,
   onPathway,
 }: {
-  department: string;
+  pathway: Pathway | null;
   onPathway: (p: Pathway) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +25,7 @@ export function AiOrb({
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
             className="fixed bottom-24 right-6 z-50 flex h-[30rem] w-[22rem] flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl"
           >
-            <AiAssistant department={department} onPathway={onPathway} onClose={() => setOpen(false)} />
+            <AiAssistant pathway={pathway} onPathway={onPathway} onClose={() => setOpen(false)} />
           </motion.div>
         )}
       </AnimatePresence>

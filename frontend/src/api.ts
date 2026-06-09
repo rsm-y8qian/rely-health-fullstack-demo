@@ -101,6 +101,25 @@ export async function undoPatient(id: string): Promise<Enrollment> {
   return data.enrollment;
 }
 
+export interface AgentEditResult {
+  pathway: Pathway;
+  reply: string;
+  actions: string[];
+  validation: { ok: boolean; errors: string[] };
+}
+
+// Ask the AI agent to edit an existing pathway via its tool-use loop.
+export async function agentEditPathway(prompt: string, pathway: Pathway): Promise<AgentEditResult> {
+  const res = await fetch("/api/agent/edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, pathway }),
+  });
+  const data = (await res.json()) as AgentEditResult & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data;
+}
+
 // Ask the AI to generate a pathway from natural language. Surfaces the server's
 // guardrail error message when generation is rejected.
 export async function generatePathwayAI(prompt: string, department?: string): Promise<Pathway> {

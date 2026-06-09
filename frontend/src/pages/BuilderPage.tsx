@@ -32,6 +32,13 @@ export default function BuilderPage() {
     navigate("/app");
   }
 
+  // After the agent edits the pathway, apply it and refresh the block palette
+  // (the agent may have created a new capability).
+  function applyAgentPathway(p: Pathway) {
+    setPathway(p);
+    fetchCapabilities().then(setCapabilities);
+  }
+
   async function saveMeta(meta: { name: string; description: string }) {
     if (id) {
       const updated = await updatePathwayMeta(id, meta);
@@ -76,7 +83,7 @@ export default function BuilderPage() {
         </div>
       )}
 
-      <AiOrb department={pathway?.department ?? ""} onPathway={setPathway} />
+      <AiOrb pathway={pathway} onPathway={applyAgentPathway} />
 
       <AnimatePresence>
         {confirmDelete && pathway && (
