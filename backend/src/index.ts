@@ -22,6 +22,7 @@ import {
   seedEnrollments,
 } from "./pathways/enrollments.js";
 import { generatePathway } from "./ai/generatePathway.js";
+import { agentEditPathway } from "./ai/agentEditPathway.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -200,6 +201,29 @@ app.post("/api/ai/generate-pathway", async (req, res) => {
   const result = await generatePathway(parsed.data.prompt, parsed.data.department);
   if ("error" in result) return res.status(422).json({ error: result.error });
   res.json(result);
+});
+
+// AI agent: edit the given pathway via a tool-use loop.
+const agentSchema = z.object({
+  prompt: z.string().min(1),
+  pathway: z.object({
+    id: z.string(),
+    name: z.string(),
+    department: z.string().optional(),
+    startStepId: z.string(),
+    steps: z.array(z.any()),
+  }),
+});
+
+app.post("/api/agent/edit", async (req, res) => {
+  const parsed = agentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+  try {
+    const result = await agentEditPathway(parsed.data.prompt, parsed.data.pathway as never);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Agent failed" });
+  }
 });
 
 seedEnrollments();
