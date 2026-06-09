@@ -27,27 +27,88 @@ const NODE_W = 224;
 const NODE_H = 110;
 const elk = new ELK();
 
-// ELK layered layout — GREEDY cycle-breaking + BRANDES_KOEPF placement give a
-// centered spine with clean side branches, even with back-edges (the "Tidy").
-async function layout(nodes: Node[], edges: Edge[]): Promise<Node[]> {
+export type ElkPort = { id: string; x: number; y: number };
+
+// ELK layered layout with port-aware ORTHOGONAL edge routing. ELK positions the
+// nodes AND routes each edge (returning bend points), so transitions run in
+// clean channels and labels sit between nodes — not on top of them.
+async function layout(
+  nodes: Node[],
+  edges: Edge[],
+): Promise<{ nodes: Node[]; edges: Edge[] }> {
+  // Collect the handles each node actually uses (one ELK port per handle).
+  const srcPorts = new Map<string, Set<string>>();
+  const tgtPorts = new Map<string, Set<string>>();
+  for (const e of edges) {
+    if (e.sourceHandle) (srcPorts.get(e.source) ?? srcPorts.set(e.source, new Set()).get(e.source)!).add(e.sourceHandle);
+    if (e.targetHandle) (tgtPorts.get(e.target) ?? tgtPorts.set(e.target, new Set()).get(e.target)!).add(e.targetHandle);
+  }
+
   const graph = {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "DOWN",
+      "elk.edgeRouting": "ORTHOGONAL",
       "elk.layered.cycleBreaking.strategy": "GREEDY",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
       "elk.layered.spacing.nodeNodeBetweenLayers": "90",
-      "elk.spacing.nodeNode": "70",
+      "elk.spacing.nodeNode": "80",
+      "elk.spacing.edgeNode": "25",
+      "elk.spacing.edgeEdge": "18",
     },
-    children: nodes.map((n) => ({ id: n.id, width: NODE_W, height: NODE_H })),
-    edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    children: nodes.map((n) => {
+      const tgt = [...(tgtPorts.get(n.id) ?? [])].sort();
+      const src = [...(srcPorts.get(n.id) ?? [])].sort();
+      return {
+        id: n.id,
+        width: NODE_W,
+        height: NODE_H,
+        layoutOptions: { "org.eclipse.elk.portConstraints": "FIXED_ORDER" },
+        ports: [
+          ...tgt.map((h, i) => ({
+            id: `${n.id}::${h}`,
+            layoutOptions: { "org.eclipse.elk.port.side": "NORTH", "org.eclipse.elk.port.index": String(i) },
+          })),
+          ...src.map((h, i) => ({
+            id: `${n.id}::${h}`,
+            layoutOptions: { "org.eclipse.elk.port.side": "SOUTH", "org.eclipse.elk.port.index": String(i) },
+          })),
+        ],
+      };
+    }),
+    edges: edges.map((e) => ({
+      id: e.id,
+      sources: [e.sourceHandle ? `${e.source}::${e.sourceHandle}` : e.source],
+      targets: [e.targetHandle ? `${e.target}::${e.targetHandle}` : e.target],
+    })),
   };
-  const laidOut = await elk.layout(graph);
-  const pos = new Map((laidOut.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
-  return nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
+
+  const out = await elk.layout(graph);
+  const childById = new Map((out.children ?? []).map((c) => [c.id, c]));
+
+  const newNodes = nodes.map((n) => {
+    const c = childById.get(n.id);
+    const ports: ElkPort[] = (c?.ports ?? []).map((p) => ({
+      id: String(p.id).split("::")[1],
+      x: p.x ?? 0,
+      y: p.y ?? 0,
+    }));
+    return { ...n, position: { x: c?.x ?? 0, y: c?.y ?? 0 }, data: { ...n.data, ports } };
+  });
+
+  const ptsById = new Map(
+    (out.edges ?? []).map((e) => {
+      const sec = (e as { sections?: { startPoint: { x: number; y: number }; bendPoints?: { x: number; y: number }[]; endPoint: { x: number; y: number } }[] }).sections?.[0];
+      const pts = sec ? [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint] : [];
+      return [e.id, pts];
+    }),
+  );
+  const newEdges = edges.map((e) => ({ ...e, data: { ...e.data, points: ptsById.get(e.id) ?? [] } }));
+
+  return { nodes: newNodes, edges: newEdges };
 }
 
 // Translate a pathway (data) into React Flow nodes + edges (visuals).
@@ -140,7 +201,8 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
     setPast([]);
     layout(f.nodes, f.edges).then((laid) => {
       if (cancelled) return;
-      setNodes(laid as StepNodeType[]);
+      setNodes(laid.nodes as StepNodeType[]);
+      setEdges(laid.edges);
       setTimeout(() => fitView({ duration: 300 }), 0);
     });
     return () => {
@@ -176,9 +238,10 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
   const tidy = useCallback(async () => {
     takeSnapshot();
     const laid = await layout(getNodes(), getEdges());
-    setNodes(laid as StepNodeType[]);
+    setNodes(laid.nodes as StepNodeType[]);
+    setEdges(laid.edges);
     setTimeout(() => fitView({ duration: 400 }), 0);
-  }, [setNodes, getNodes, getEdges, fitView, takeSnapshot]);
+  }, [setNodes, setEdges, getNodes, getEdges, fitView, takeSnapshot]);
 
   const deleteSelected = useCallback(() => {
     deleteElements({

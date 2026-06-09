@@ -1,11 +1,4 @@
-import {
-  Handle,
-  Position,
-  useReactFlow,
-  useNodeConnections,
-  type Node,
-  type NodeProps,
-} from "@xyflow/react";
+import { Handle, Position, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import { X, Clock, UserRound, Bot } from "lucide-react";
 import { iconForAction, labelForAction } from "../icons";
 import { formatWait } from "../../lib/format";
@@ -17,26 +10,11 @@ export type StepNodeData = {
   waitMinutes?: number;
   assignee?: string;
   isStart?: boolean;
+  ports?: { id: string; x: number; y: number }[];
 };
 export type StepNodeType = Node<StepNodeData, "step">;
 
-// Spread N handles evenly across an edge of the node.
-function Handles({ n, type, prefix, position }: { n: number; type: "source" | "target"; prefix: string; position: Position }) {
-  return (
-    <>
-      {Array.from({ length: n }, (_, i) => (
-        <Handle
-          key={`${prefix}${i}`}
-          id={`${prefix}${i}`}
-          type={type}
-          position={position}
-          style={{ left: `${(100 * (i + 1)) / (n + 1)}%` }}
-          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
-        />
-      ))}
-    </>
-  );
-}
+const handleClass = "!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100";
 
 export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
   const Icon = iconForAction(data.action);
@@ -44,9 +22,11 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
   const wait = formatWait(data.waitMinutes);
   const isAi = data.assignee?.toLowerCase().includes("ai");
 
-  // One handle per connection, plus a spare — so handles grow as edges are added.
-  const sourceCount = useNodeConnections({ handleType: "source" }).length + 1;
-  const targetCount = useNodeConnections({ handleType: "target" }).length + 1;
+  // Handles at the positions ELK routed each edge to (so lines line up with the
+  // routing), plus one spare on each side for drawing a new connection.
+  const ports = data.ports ?? [];
+  const srcSpare = `s${ports.filter((p) => p.id.startsWith("s")).length}`;
+  const tgtSpare = `t${ports.filter((p) => p.id.startsWith("t")).length}`;
 
   return (
     <div
@@ -65,7 +45,12 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         <X className="size-3" />
       </button>
 
-      <Handles n={targetCount} type="target" prefix="t" position={Position.Top} />
+      {ports
+        .filter((p) => p.id.startsWith("t"))
+        .map((p) => (
+          <Handle key={p.id} id={p.id} type="target" position={Position.Top} style={{ left: p.x, top: 0 }} className={handleClass} />
+        ))}
+      <Handle id={tgtSpare} type="target" position={Position.Top} style={{ left: "50%" }} className={handleClass} />
 
       <div className="flex items-start gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink-soft text-white">
@@ -100,7 +85,12 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         </div>
       )}
 
-      <Handles n={sourceCount} type="source" prefix="s" position={Position.Bottom} />
+      {ports
+        .filter((p) => p.id.startsWith("s"))
+        .map((p) => (
+          <Handle key={p.id} id={p.id} type="source" position={Position.Bottom} style={{ left: p.x, bottom: 0, top: "auto" }} className={handleClass} />
+        ))}
+      <Handle id={srcSpare} type="source" position={Position.Bottom} style={{ left: "50%" }} className={handleClass} />
     </div>
   );
 }

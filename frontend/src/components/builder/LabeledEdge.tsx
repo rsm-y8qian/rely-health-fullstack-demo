@@ -10,12 +10,56 @@ import { EVENT_OPTIONS, type EventType } from "../../types";
 
 const pretty = (s: string) => s.replace(/_/g, " ");
 
+type Pt = { x: number; y: number };
+
+// Build a rounded orthogonal SVG path from ELK's bend points, and find the
+// midpoint (by length) so the label sits in the routing channel, off the nodes.
+function pathFromPoints(points: Pt[], r = 8): { d: string; mid: Pt } {
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const next = points[i + 1];
+    const v1 = norm(cur, prev, r);
+    const v2 = norm(cur, next, r);
+    d += ` L ${v1.x},${v1.y} Q ${cur.x},${cur.y} ${v2.x},${v2.y}`;
+  }
+  const last = points[points.length - 1];
+  d += ` L ${last.x},${last.y}`;
+
+  let total = 0;
+  const segs: number[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const len = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    segs.push(len);
+    total += len;
+  }
+  let half = total / 2;
+  let mid = points[0];
+  for (let i = 1; i < points.length; i++) {
+    const len = segs[i - 1];
+    if (half <= len) {
+      const t = len ? half / len : 0;
+      mid = { x: points[i - 1].x + (points[i].x - points[i - 1].x) * t, y: points[i - 1].y + (points[i].y - points[i - 1].y) * t };
+      break;
+    }
+    half -= len;
+  }
+  return { d, mid };
+}
+
+function norm(from: Pt, to: Pt, r: number): Pt {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const k = Math.min(r, len / 2) / len;
+  return { x: from.x + dx * k, y: from.y + dy * k };
+}
+
 // A transition edge. Its label is the event that triggers the transition —
 // editable via a dropdown of valid events (free text would break the engine).
 export function LabeledEdge({
   id,
-  source,
-  target,
   sourceX,
   sourceY,
   targetX,
@@ -25,19 +69,27 @@ export function LabeledEdge({
   data,
   markerEnd,
 }: EdgeProps) {
-  // Orthogonal (right-angle) routing for a clean flowchart look.
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 10,
-  });
-  // Nudge the label perpendicular by direction so two opposite edges between the
-  // same pair of nodes don't stack their labels on top of each other.
-  const offsetY = source < target ? -11 : 11;
+  // Prefer ELK's routed polyline; fall back to smoothstep for freshly-drawn edges.
+  const points = (data?.points as Pt[] | undefined) ?? [];
+  let path: string;
+  let labelX: number;
+  let labelY: number;
+  if (points.length >= 2) {
+    const { d, mid } = pathFromPoints(points);
+    path = d;
+    labelX = mid.x;
+    labelY = mid.y;
+  } else {
+    [path, labelX, labelY] = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      borderRadius: 10,
+    });
+  }
   const { deleteElements, setEdges } = useReactFlow();
   const [editing, setEditing] = useState(false);
   const event = (data?.event as EventType) ?? "patient_replied";
@@ -55,7 +107,7 @@ export function LabeledEdge({
       <EdgeLabelRenderer>
         <div
           style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + offsetY}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
             zIndex: 1000,
           }}
