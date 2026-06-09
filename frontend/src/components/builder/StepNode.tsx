@@ -1,4 +1,11 @@
-import { Handle, Position, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useReactFlow,
+  useNodeConnections,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { X, Clock, UserRound, Bot } from "lucide-react";
 import { iconForAction, labelForAction } from "../icons";
 import { formatWait } from "../../lib/format";
@@ -13,11 +20,33 @@ export type StepNodeData = {
 };
 export type StepNodeType = Node<StepNodeData, "step">;
 
+// Spread N handles evenly across an edge of the node.
+function Handles({ n, type, prefix, position }: { n: number; type: "source" | "target"; prefix: string; position: Position }) {
+  return (
+    <>
+      {Array.from({ length: n }, (_, i) => (
+        <Handle
+          key={`${prefix}${i}`}
+          id={`${prefix}${i}`}
+          type={type}
+          position={position}
+          style={{ left: `${(100 * (i + 1)) / (n + 1)}%` }}
+          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
+        />
+      ))}
+    </>
+  );
+}
+
 export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
   const Icon = iconForAction(data.action);
   const { deleteElements } = useReactFlow();
   const wait = formatWait(data.waitMinutes);
   const isAi = data.assignee?.toLowerCase().includes("ai");
+
+  // One handle per connection, plus a spare — so handles grow as edges are added.
+  const sourceCount = useNodeConnections({ handleType: "source" }).length + 1;
+  const targetCount = useNodeConnections({ handleType: "target" }).length + 1;
 
   return (
     <div
@@ -36,16 +65,7 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         <X className="size-3" />
       </button>
 
-      {[0, 1, 2].map((i) => (
-        <Handle
-          key={`t${i}`}
-          id={`t${i}`}
-          type="target"
-          position={Position.Top}
-          style={{ left: `${25 * (i + 1)}%` }}
-          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
-        />
-      ))}
+      <Handles n={targetCount} type="target" prefix="t" position={Position.Top} />
 
       <div className="flex items-start gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink-soft text-white">
@@ -80,16 +100,7 @@ export function StepNode({ id, data, selected }: NodeProps<StepNodeType>) {
         </div>
       )}
 
-      {[0, 1, 2].map((i) => (
-        <Handle
-          key={`s${i}`}
-          id={`s${i}`}
-          type="source"
-          position={Position.Bottom}
-          style={{ left: `${25 * (i + 1)}%` }}
-          className="!size-2 !border-0 !bg-stone-400 opacity-0 transition group-hover:opacity-100"
-        />
-      ))}
+      <Handles n={sourceCount} type="source" prefix="s" position={Position.Bottom} />
     </div>
   );
 }

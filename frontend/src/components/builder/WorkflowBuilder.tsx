@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { AnimatePresence } from "motion/react";
-import dagre from "dagre";
+import ELK from "elkjs/lib/elk.bundled.js";
 import { Trash2, Unlink, LassoSelect, Wand2, Undo2 } from "lucide-react";
 import { StepNode, type StepNodeType, type StepNodeData } from "./StepNode";
 import { LabeledEdge } from "./LabeledEdge";
@@ -25,21 +25,29 @@ import type { Capability, Pathway } from "../../types";
 
 const NODE_W = 224;
 const NODE_H = 110;
+const elk = new ELK();
 
-// Run dagre to assign clean, minimal-crossing positions (the "Tidy" layout).
-function layout(nodes: Node[], edges: Edge[]): Node[] {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  // Generous spacing + reserve space for each edge's label so labels don't
-  // land on top of nodes.
-  g.setGraph({ rankdir: "TB", ranksep: 120, nodesep: 110, edgesep: 40 });
-  nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
-  edges.forEach((e) => g.setEdge(e.source, e.target, { width: 90, height: 24, labelpos: "c" }));
-  dagre.layout(g);
-  return nodes.map((n) => {
-    const p = g.node(n.id);
-    return { ...n, position: { x: p.x - NODE_W / 2, y: p.y - NODE_H / 2 } };
-  });
+// ELK layered layout — GREEDY cycle-breaking + BRANDES_KOEPF placement give a
+// centered spine with clean side branches, even with back-edges (the "Tidy").
+async function layout(nodes: Node[], edges: Edge[]): Promise<Node[]> {
+  const graph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "DOWN",
+      "elk.layered.cycleBreaking.strategy": "GREEDY",
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+      "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "90",
+      "elk.spacing.nodeNode": "70",
+    },
+    children: nodes.map((n) => ({ id: n.id, width: NODE_W, height: NODE_H })),
+    edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+  };
+  const laidOut = await elk.layout(graph);
+  const pos = new Map((laidOut.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
+  return nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
 }
 
 // Translate a pathway (data) into React Flow nodes + edges (visuals).
@@ -56,17 +64,8 @@ function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
     },
   }));
 
-  // Spread parallel edges across 3 source/target handles so vertical runs
-  // don't stack on top of each other (keeps the flow direction legible).
-  const outCount = new Map<string, number>();
-  const inCount = new Map<string, number>();
-  for (const s of pathway.steps) {
-    for (const to of Object.values(s.transitions)) {
-      outCount.set(s.id, (outCount.get(s.id) ?? 0) + 1);
-      inCount.set(to, (inCount.get(to) ?? 0) + 1);
-    }
-  }
-  const slot = (i: number, n: number) => (n <= 1 ? 1 : n === 2 ? (i === 0 ? 0 : 2) : i % 3);
+  // Give every edge its own source/target handle so each transition runs in its
+  // own column — no overlap. Nodes render one handle per connection + a spare.
   const outIdx = new Map<string, number>();
   const inIdx = new Map<string, number>();
 
@@ -80,8 +79,8 @@ function toFlow(pathway: Pathway): { nodes: StepNodeType[]; edges: Edge[] } {
         id: `${s.id}-${event}-${to}`,
         source: s.id,
         target: to,
-        sourceHandle: `s${slot(oi, outCount.get(s.id) ?? 1)}`,
-        targetHandle: `t${slot(ii, inCount.get(to) ?? 1)}`,
+        sourceHandle: `s${oi}`,
+        targetHandle: `t${ii}`,
         type: "labeled",
         label: event.replace(/_/g, " "),
         data: { event },
@@ -97,12 +96,8 @@ const nodeTypes = { step: StepNode };
 const edgeTypes = { labeled: LabeledEdge };
 
 function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilities: Capability[] }) {
-  const initial = useMemo(() => {
-    const f = toFlow(pathway);
-    return { nodes: layout(f.nodes, f.edges) as StepNodeType[], edges: f.edges };
-  }, [pathway]);
-  const [nodes, setNodes, onNodesChange] = useNodesState<StepNodeType>(initial.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<StepNodeType>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [lasso, setLasso] = useState(false);
   const [selCount, setSelCount] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -137,11 +132,21 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
     [editingId, setNodes, takeSnapshot],
   );
 
+  // On pathway load: build nodes/edges, then run the async ELK layout.
   useEffect(() => {
-    setNodes(initial.nodes);
-    setEdges(initial.edges);
+    let cancelled = false;
+    const f = toFlow(pathway);
+    setEdges(f.edges);
     setPast([]);
-  }, [initial, setNodes, setEdges]);
+    layout(f.nodes, f.edges).then((laid) => {
+      if (cancelled) return;
+      setNodes(laid as StepNodeType[]);
+      setTimeout(() => fitView({ duration: 300 }), 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathway, setNodes, setEdges, fitView]);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -168,11 +173,12 @@ function BuilderInner({ pathway, capabilities }: { pathway: Pathway; capabilitie
     [setNodes, takeSnapshot],
   );
 
-  const tidy = useCallback(() => {
+  const tidy = useCallback(async () => {
     takeSnapshot();
-    setNodes((ns) => layout(ns, getEdges()) as StepNodeType[]);
+    const laid = await layout(getNodes(), getEdges());
+    setNodes(laid as StepNodeType[]);
     setTimeout(() => fitView({ duration: 400 }), 0);
-  }, [setNodes, getEdges, fitView, takeSnapshot]);
+  }, [setNodes, getNodes, getEdges, fitView, takeSnapshot]);
 
   const deleteSelected = useCallback(() => {
     deleteElements({
