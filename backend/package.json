@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsx src/ai/pathwayTools.test.ts"
+    "test": "tsx src/ai/pathwayTools.test.ts",
+    "eval": "tsx src/ai/agent.eval.ts"
   },
   "keywords": [],
   "author": "",
