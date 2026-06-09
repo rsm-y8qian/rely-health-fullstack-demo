@@ -167,6 +167,27 @@ app.post("/api/enrollments/:id/back", (req, res) => {
   res.json({ enrollment: result });
 });
 
+// ---- Interoperability: ingest a normalized feed event (from the Python service) ----
+// The Python ingestion layer turns messy third-party FHIR into this clean shape;
+// here we map the event onto a pathway and auto-enroll the patient.
+const ingestSchema = z.object({
+  patientName: z.string().min(1),
+  department: z.string().min(1),
+  eventType: z.string(),
+});
+
+app.post("/api/ingest", (req, res) => {
+  const parsed = ingestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid ingest event" });
+  const { patientName, department } = parsed.data;
+  const pathway = listPathways(department)[0];
+  if (!pathway) return res.status(404).json({ error: `No pathway for department "${department}"` });
+  const result = enroll(patientName, pathway.id);
+  if ("error" in result) return res.status(400).json({ error: result.error });
+  broadcast({ type: "enrollment", enrollment: result });
+  res.status(201).json({ enrollment: result });
+});
+
 // ---- AI: generate a pathway from natural language ----
 const aiSchema = z.object({
   prompt: z.string().min(1),
