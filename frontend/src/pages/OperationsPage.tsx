@@ -90,6 +90,24 @@ export default function OperationsPage() {
     fetchEnrollments(pathway.id).then(setEnrollments);
   }, [pathway]);
 
+  // Live updates: subscribe to the server stream and merge changes for this
+  // pathway as they arrive — no polling, no refresh.
+  useEffect(() => {
+    if (!pathway) return;
+    const es = new EventSource("/api/stream");
+    es.onmessage = (e) => {
+      const payload = JSON.parse(e.data) as { type: string; enrollment: Enrollment };
+      if (payload.type !== "enrollment" || payload.enrollment.pathwayId !== pathway.id) return;
+      setEnrollments((list) => {
+        const exists = list.some((x) => x.id === payload.enrollment.id);
+        return exists
+          ? list.map((x) => (x.id === payload.enrollment.id ? payload.enrollment : x))
+          : [...list, payload.enrollment];
+      });
+    };
+    return () => es.close();
+  }, [pathway]);
+
   async function handleEvent(id: string, event: EventType) {
     const updated = await sendPatientEvent(id, event);
     setEnrollments((list) => list.map((e) => (e.id === id ? updated : e)));

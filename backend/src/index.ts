@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Response } from "express";
 import cors from "cors";
 import "dotenv/config";
 import { programs } from "./data/programs.js";
@@ -29,6 +29,24 @@ const PORT = process.env.PORT ?? 4000;
 // Middleware: allow the frontend (different port) to call us, and parse JSON bodies.
 app.use(cors());
 app.use(express.json());
+
+// ---- Real-time stream (Server-Sent Events) ----
+// Frontends subscribe once; we push enrollment changes to all of them.
+const sseClients = new Set<Response>();
+
+function broadcast(payload: unknown) {
+  const frame = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) client.write(frame);
+}
+
+app.get("/api/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.write(": connected\n\n");
+  sseClients.add(res);
+  req.on("close", () => sseClients.delete(res));
+});
 
 // Health check — a tiny endpoint to confirm the server is alive.
 app.get("/api/health", (_req, res) => {
@@ -129,6 +147,7 @@ app.post("/api/enrollments", (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid enrollment" });
   const result = enroll(parsed.data.patientName, parsed.data.pathwayId);
   if ("error" in result) return res.status(400).json({ error: result.error });
+  broadcast({ type: "enrollment", enrollment: result });
   res.status(201).json({ enrollment: result });
 });
 
@@ -137,12 +156,14 @@ app.post("/api/enrollments/:id/event", (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid event" });
   const result = sendEvent(req.params.id, parsed.data.event);
   if ("error" in result) return res.status(400).json({ error: result.error });
+  broadcast({ type: "enrollment", enrollment: result });
   res.json({ enrollment: result });
 });
 
 app.post("/api/enrollments/:id/back", (req, res) => {
   const result = undo(req.params.id);
   if ("error" in result) return res.status(400).json({ error: result.error });
+  broadcast({ type: "enrollment", enrollment: result });
   res.json({ enrollment: result });
 });
 
